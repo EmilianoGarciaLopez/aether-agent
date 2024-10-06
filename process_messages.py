@@ -66,45 +66,6 @@ def visualize_messages_markdown(messages):
         print('---')  # Separator between messages
 
 
-def visualize_messages_jupyter(messages):
-    for idx, message in enumerate(messages, 1):
-        role = message.get('role', 'unknown')
-        name = message.get('name', '')
-        content_items = message.get('content', [])
-        text_entries = [item for item in content_items if item.get('type') == 'text']
-        image_entries = [item for item in content_items if item.get('type') == 'image_url']
-        
-        # Message Header
-        header = f"## Message {idx}: Role: {role}"
-        if name:
-            header += f", Name: {name}"
-        display(Markdown(header))
-        
-        # Text Entries
-        for i, item in enumerate(text_entries, 1):
-            text_content = item.get('text', '')
-            formatted_text = text_content.strip().replace('\n', '\n> ')
-            display(Markdown(f"### Text Entry {i}:\n"))
-            display(Markdown(f"> {formatted_text}\n"))
-        
-        # Image Entries
-        for i, item in enumerate(image_entries, 1):
-            url = item.get('image_url', {}).get('url', '')
-            display(Markdown(f"### Image Entry {i}:\n"))
-            if url.startswith('data:image/'):
-                # Extract the base64 data
-                header, base64_data = url.split(',', 1)
-                img = Image(data=base64.b64decode(base64_data))
-                display(img)
-            else:
-                # Display image from URL
-                display(Markdown(f"![Image {i}]({url})\n"))
-        
-        display(Markdown('---'))
-        
-from IPython.display import display, Markdown, Image
-import base64
-
 def visualize_messages_jupyter(messages, img_width=600):
     for idx, message in enumerate(messages, 1):
         role = message.get('role', 'unknown')
@@ -140,6 +101,40 @@ def visualize_messages_jupyter(messages, img_width=600):
                 display(Markdown(f"![Image {i}]({url})\n"))
         
         display(Markdown('---'))
+
+
+def shorten_base64_strings(obj):
+    """
+    Recursively traverse the object and shorten any Base64 strings to a maximum of 10 characters.
+    """
+    base64_pattern = re.compile(r'(data:[^;]+;base64,)([A-Za-z0-9+/=]+)')
+    
+    if isinstance(obj, dict):
+        # Recursively process dictionary values
+        return {k: shorten_base64_strings(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        # Recursively process list items
+        return [shorten_base64_strings(item) for item in obj]
+    elif isinstance(obj, str):
+        # Shorten Base64 strings in the string
+        def replacer(match):
+            prefix = match.group(1)
+            base64_str = match.group(2)
+            # Shorten the Base64 string if it's longer than 10 characters
+            if len(base64_str) > 10:
+                base64_str = base64_str[:10]
+            return prefix + base64_str
+        return base64_pattern.sub(replacer, obj)
+    else:
+        # Return the object unchanged if it's not a dict, list, or string
+        return obj
+
+def shorten_base64_in_messages(messages):
+    """
+    Process a list of OpenAI messages and shorten all Base64 strings within them.
+    """
+    return [shorten_base64_strings(message) for message in messages]
+
 
 
 def main():
